@@ -1,13 +1,71 @@
-# Archivos de compilación de Qt y C++
-build-*/
-*.user
+# ==========================================
+# Qt Creator / qmake / CMake (Multiplataforma)
+# ==========================================
+build-*
 *.pro.user
+*.pro.user.*
+*.autosave
+.qmake.stash
+Makefile*
+debug/
+release/
+moc_*
+ui_*
+qrc_*
+object_script.*
+CMakeLists.txt.user*
+CMakeCache.txt
+CMakeFiles/
+
+# ==========================================
+# Binarios y compilados (Linux, Windows, macOS)
+# ==========================================
 *.o
 *.obj
 *.exe
 *.dll
 *.so
+*.dylib
+*.a
+*.lib
+*.pdb
+*.ilk
+*.exp
+*.app/
+ProyectoFinal
+src/ProyectoFinal
 
-# Archivos del sistema
-.DS_Store
+# ==========================================
+# Editores e IDEs
+# ==========================================
+.vscode/
+.vs/
+.idea/
+*.swp
+*.swo
+*~
+
+# ==========================================
+# Sistema Operativo: Windows
+# ==========================================
 Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ==========================================
+# Sistema Operativo: macOS
+# ==========================================
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# ==========================================
+# Sistema Operativo: Linux
+# ==========================================
+.directory
+.Trash-*
