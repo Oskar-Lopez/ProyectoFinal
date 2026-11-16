@@ -2,30 +2,43 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QTimer>
-#include <QPainter>
+#include <QTimer>       // [NUEVO] Temporizador para el bucle de 60 FPS
 #include <QKeyEvent>
-#include "../levels/Nivel.h"
+#include <QPaintEvent>
+#include "../entities/ClarkKent.h" // [NUEVO] Inclusión del protagonista
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
 
 private:
-    QTimer* timerJuego;
-    Nivel* nivelActual;
-    bool enPresentacion;
-    bool juegoCompletado;
+    enum class EstadoJuego {
+        MENU,
+        JUGANDO
+    };
 
-public:
-    explicit MainWindow(QWidget* parent = nullptr);
-    ~MainWindow();
+    EstadoJuego estadoActual;
+    QTimer *timerJuego;         // [NUEVO] Bucle principal de actualización
+    ClarkKent jugador;          // [NUEVO] Instancia de Clark Kent
 
-protected:
-    void paintEvent(QPaintEvent* event) override;
-    void keyPressEvent(QKeyEvent* event) override;
+    // [NUEVO] Banderas para movimiento fluido al mantener teclas presionadas
+    bool teclaIzquierda;
+    bool teclaDerecha;
+
+    static constexpr int ANCHO_VENTANA = 1280;
+    static constexpr int ALTO_VENTANA = 720;
+    static constexpr int NIVEL_SUELO = 620; // [NUEVO] Altura Y donde apoya el personaje
 
 private slots:
-    void actualizarFrame();
+    void actualizarJuego();     // [NUEVO] Slot ejecutado por el QTimer cada 16 ms
+
+protected:
+    void keyPressEvent(QKeyEvent *event) override;
+    void keyReleaseEvent(QKeyEvent *event) override; // [NUEVO] Detecta cuando se suelta una tecla
+    void paintEvent(QPaintEvent *event) override;
+
+public:
+    explicit MainWindow(QWidget *parent = nullptr);
+    ~MainWindow() override = default;
 };
 
 #endif // MAINWINDOW_H
