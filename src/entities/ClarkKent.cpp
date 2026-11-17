@@ -11,33 +11,54 @@ ClarkKent::ClarkKent(int xInicial, int yInicial, int ancho, int alto)
       mirandoDerecha(true) {
 }
 
-// [FIX] Implementa el desplazamiento según las velocidades actuales (heredado de Personaje)
 void ClarkKent::moverse() {
     x += static_cast<int>(vx);
     y += static_cast<int>(vy);
 }
 
-// [FIX] Implementación sin parámetros (heredado de Entidad) con los límites por defecto
 void ClarkKent::actualizar() {
-    actualizar(1280, 620);
+    actualizar(1280, 620, {});
 }
 
-// Actualización física completa con límites dinámicos
-void ClarkKent::actualizar(int limiteAnchoPantalla, int ySuelo) {
-    // 1. Aplicar gravedad
-    vy += gravedad;
+void ClarkKent::actualizar(int limiteAnchoPantalla, int ySuelo, const QVector<QRect> &plataformas) {
+    // --- FASE 1: MOVIMIENTO Y COLISIÓN HORIZONTAL (EJE X) ---
+    x += static_cast<int>(vx);
 
-    // 2. Aplicar desplazamiento
-    moverse();
-
-    // 3. Limitar bordes izquierdo y derecho
     if (x < 0) {
         x = 0;
     } else if (x + ancho > limiteAnchoPantalla) {
         x = limiteAnchoPantalla - ancho;
     }
 
-    // 4. Colisión con el suelo
+    for (const QRect &plat : plataformas) {
+        if (getHitbox().intersects(plat)) {
+            if (vx > 0.0f) {
+                x = plat.x() - ancho;
+            } else if (vx < 0.0f) {
+                x = plat.x() + plat.width();
+            }
+        }
+    }
+
+    // --- FASE 2: GRAVEDAD Y COLISIÓN VERTICAL (EJE Y) ---
+    vy += gravedad;
+    y += static_cast<int>(vy);
+    enSuelo = false;
+
+    for (const QRect &plat : plataformas) {
+        if (getHitbox().intersects(plat)) {
+            if (vy > 0.0f) {
+                y = plat.y() - alto;
+                vy = 0.0f;
+                enSuelo = true;
+            } else if (vy < 0.0f) {
+                y = plat.y() + plat.height();
+                vy = 0.0f;
+            }
+        }
+    }
+
+    // Colisión con el suelo base
     if (y + alto >= ySuelo) {
         y = ySuelo - alto;
         vy = 0.0f;
@@ -45,7 +66,6 @@ void ClarkKent::actualizar(int limiteAnchoPantalla, int ySuelo) {
     }
 }
 
-// [FIX] Permite a Nivel.cpp ubicar a Clark Kent en el mapa
 void ClarkKent::setPosicion(int nuevoX, int nuevoY) {
     x = nuevoX;
     y = nuevoY;
