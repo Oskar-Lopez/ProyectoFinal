@@ -3,6 +3,7 @@
 
 #include "Personaje.h"
 #include <QRect>
+#include <QVector>
 
 class ClarkKent : public Personaje {
 private:
@@ -17,14 +18,10 @@ private:
 public:
     ClarkKent(int xInicial = 120, int yInicial = 500, int ancho = 46, int alto = 76);
 
-    // [FIX] Implementación obligatoria de los métodos virtuales puros de Entidad y Personaje
     void actualizar() override;
     void moverse() override;
+    void actualizar(int limiteAnchoPantalla, int ySuelo, const QVector<QRect> &plataformas = {});
 
-    // [FIX] Sobrecarga con límites de pantalla usada por MainWindow
-    void actualizar(int limiteAnchoPantalla, int ySuelo);
-
-    // [FIX] Método requerido por Nivel.cpp
     void setPosicion(int nuevoX, int nuevoY);
 
     void moverIzquierda();
