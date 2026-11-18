@@ -1,19 +1,24 @@
 #include "ClarkKent.h"
+#include "../physics/ConstantesFisicas.h"
 
 ClarkKent::ClarkKent(int xInicial, int yInicial, int ancho, int alto)
     : Personaje(xInicial, yInicial, ancho, alto),
+      posX(static_cast<float>(xInicial)),
+      posY(static_cast<float>(yInicial)),
       vx(0.0f),
       vy(0.0f),
-      velocidadMovimiento(6.5f),
-      fuerzaSalto(-17.0f),
-      gravedad(0.85f),
+      velocidadMovimiento(Fisica::VELOCIDAD_CLARK),
+      fuerzaSalto(Fisica::IMPULSO_SALTO_CLARK),
+      gravedad(Fisica::GRAVEDAD),
       enSuelo(false),
       mirandoDerecha(true) {
 }
 
 void ClarkKent::moverse() {
-    x += static_cast<int>(vx);
-    y += static_cast<int>(vy);
+    posX += vx * Fisica::DT;
+    posY += vy * Fisica::DT;
+    x = static_cast<int>(posX);
+    y = static_cast<int>(posY);
 }
 
 void ClarkKent::actualizar() {
@@ -21,14 +26,16 @@ void ClarkKent::actualizar() {
 }
 
 void ClarkKent::actualizar(int limiteAnchoPantalla, int ySuelo, const QVector<QRect> &plataformas) {
-    // --- FASE 1: MOVIMIENTO Y COLISIÓN HORIZONTAL (EJE X) ---
-    x += static_cast<int>(vx);
+    // --- FASE 1: MOVIMIENTO (MRU) Y COLISIÓN HORIZONTAL (EJE X) ---
+    posX += vx * Fisica::DT;
 
-    if (x < 0) {
-        x = 0;
-    } else if (x + ancho > limiteAnchoPantalla) {
-        x = limiteAnchoPantalla - ancho;
+    if (posX < 0.0f) {
+        posX = 0.0f;
+    } else if (posX + ancho > static_cast<float>(limiteAnchoPantalla)) {
+        posX = static_cast<float>(limiteAnchoPantalla - ancho);
     }
+
+    x = static_cast<int>(posX);
 
     for (const QRect &plat : plataformas) {
         if (getHitbox().intersects(plat)) {
@@ -37,12 +44,20 @@ void ClarkKent::actualizar(int limiteAnchoPantalla, int ySuelo, const QVector<QR
             } else if (vx < 0.0f) {
                 x = plat.x() + plat.width();
             }
+            posX = static_cast<float>(x);
         }
     }
 
-    // --- FASE 2: GRAVEDAD Y COLISIÓN VERTICAL (EJE Y) ---
-    vy += gravedad;
-    y += static_cast<int>(vy);
+    // --- FASE 2: GRAVEDAD (MRUA) Y COLISIÓN VERTICAL (EJE Y) ---
+    float desplazamientoY = (vy * Fisica::DT) + (0.5f * gravedad * Fisica::DT * Fisica::DT);
+    vy += gravedad * Fisica::DT;
+
+    if (vy > Fisica::VELOCIDAD_CAIDA_MAX) {
+        vy = Fisica::VELOCIDAD_CAIDA_MAX;
+    }
+
+    posY += desplazamientoY;
+    y = static_cast<int>(posY);
     enSuelo = false;
 
     for (const QRect &plat : plataformas) {
@@ -55,12 +70,14 @@ void ClarkKent::actualizar(int limiteAnchoPantalla, int ySuelo, const QVector<QR
                 y = plat.y() + plat.height();
                 vy = 0.0f;
             }
+            posY = static_cast<float>(y);
         }
     }
 
     // Colisión con el suelo base
-    if (y + alto >= ySuelo) {
+    if (posY + alto >= static_cast<float>(ySuelo)) {
         y = ySuelo - alto;
+        posY = static_cast<float>(y);
         vy = 0.0f;
         enSuelo = true;
     }
@@ -69,6 +86,8 @@ void ClarkKent::actualizar(int limiteAnchoPantalla, int ySuelo, const QVector<QR
 void ClarkKent::setPosicion(int nuevoX, int nuevoY) {
     x = nuevoX;
     y = nuevoY;
+    posX = static_cast<float>(nuevoX);
+    posY = static_cast<float>(nuevoY);
 }
 
 void ClarkKent::moverIzquierda() {

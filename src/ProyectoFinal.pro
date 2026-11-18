@@ -21,3 +21,4 @@ HEADERS += \
     entities/Obstaculo.h \
     entities/Escombro.h \
     entities/Caja.h
+    physics/ConstantesFisicas.h \
