@@ -8,6 +8,7 @@
 #include <QVector>
 #include <QRect>
 #include "../entities/ClarkKent.h"
+#include "../entities/AgenteDelOlvido.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -16,7 +17,8 @@ private:
     enum class EstadoJuego {
         MENU,
         JUGANDO,
-        VICTORIA
+        VICTORIA,
+        GAME_OVER
     };
 
     EstadoJuego estadoActual;
@@ -25,6 +27,7 @@ private:
 
     QVector<QRect> plataformas;
     QVector<QRect> pistas;
+    QVector<AgenteDelOlvido> agentes;
     QRect metaNivel;
     int totalPistas;
 
