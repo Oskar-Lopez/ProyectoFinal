@@ -13,7 +13,7 @@ MainWindow::MainWindow(QWidget *parent)
       teclaDerecha(false) {
 
     setFixedSize(ANCHO_VENTANA, ALTO_VENTANA);
-    setWindowTitle("Proyecto Final - Prototipo Clark Kent");
+    setWindowTitle("Proyecto Final - Clark Kent: El Último Trayecto");
 
     iniciarEscenario();
 
@@ -37,6 +37,13 @@ void MainWindow::iniciarEscenario() {
     };
     totalPistas = static_cast<int>(pistas.size());
 
+    // Despliegue de Agentes del Olvido patrullando suelo y plataformas elevadas
+    agentes = {
+        AgenteDelOlvido(360.0f, static_cast<float>(NIVEL_SUELO - 48), 320.0f, 820.0f),
+        AgenteDelOlvido(580.0f, 400.0f - 48.0f, 560.0f, 780.0f),
+        AgenteDelOlvido(880.0f, 300.0f - 48.0f, 860.0f, 1020.0f)
+    };
+
     metaNivel = QRect(1030, 228, 44, 72);
 }
 
@@ -45,7 +52,9 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
         return;
     }
 
-    if (estadoActual == EstadoJuego::MENU || estadoActual == EstadoJuego::VICTORIA) {
+    if (estadoActual == EstadoJuego::MENU ||
+        estadoActual == EstadoJuego::VICTORIA ||
+        estadoActual == EstadoJuego::GAME_OVER) {
         if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
             iniciarEscenario();
             estadoActual = EstadoJuego::JUGANDO;
@@ -113,7 +122,27 @@ void MainWindow::actualizarJuego() {
         jugador.actualizar(ANCHO_VENTANA, NIVEL_SUELO, plataformas);
 
         QRect hitboxJugador = jugador.getHitbox();
-        for (qsizetype i = 0; i < pistas.size(); ) {
+
+        // Actualizar agentes enemigos y evaluar daño por contacto
+        for (AgenteDelOlvido &agente : agentes) {
+            agente.percibirEntorno(jugador);
+            agente.actualizar();
+
+            if (hitboxJugador.intersects(agente.getHitbox())) {
+                jugador.recibirDanio(1);
+            }
+        }
+
+        if (!jugador.estaVivo()) {
+            teclaIzquierda = false;
+            teclaDerecha = false;
+            estadoActual = EstadoJuego::GAME_OVER;
+            update();
+            return;
+        }
+
+        // Recolección de pistas
+        for (int i = 0; i < static_cast<int>(pistas.size()); ) {
             if (hitboxJugador.intersects(pistas[i])) {
                 pistas.removeAt(i);
             } else {
@@ -121,6 +150,7 @@ void MainWindow::actualizarJuego() {
             }
         }
 
+        // Condición de victoria
         if (pistas.isEmpty() && hitboxJugador.intersects(metaNivel)) {
             teclaIzquierda = false;
             teclaDerecha = false;
@@ -141,7 +171,7 @@ void MainWindow::paintEvent(QPaintEvent *event) {
         painter.setPen(Qt::white);
         painter.setFont(QFont("Arial", 28, QFont::Bold));
         painter.drawText(rect(), Qt::AlignCenter,
-                         "PROTOTIPO CLARK KENT\n\nPresiona ENTER para comenzar");
+                         "CLARK KENT: EL ÚLTIMO TRAYECTO\n\nPresiona ENTER para comenzar");
         return;
     }
 
@@ -150,6 +180,14 @@ void MainWindow::paintEvent(QPaintEvent *event) {
         painter.setFont(QFont("Arial", 30, QFont::Bold));
         painter.drawText(rect(), Qt::AlignCenter,
                          "¡OBJETIVO COMPLETADO!\n\nPresiona ENTER para volver a jugar");
+        return;
+    }
+
+    if (estadoActual == EstadoJuego::GAME_OVER) {
+        painter.setPen(QColor(235, 75, 75));
+        painter.setFont(QFont("Arial", 30, QFont::Bold));
+        painter.drawText(rect(), Qt::AlignCenter,
+                         "¡TE HAN DESCUBIERTO!\n\nPresiona ENTER para reintentar");
         return;
     }
 
@@ -174,9 +212,28 @@ void MainWindow::paintEvent(QPaintEvent *event) {
         painter.drawEllipse(pista);
     }
 
-    // Clark Kent
+    // Agentes del Olvido
+    for (const AgenteDelOlvido &agente : agentes) {
+        QRect hitboxAgente = agente.getHitbox();
+        QColor colorCuerpo = agente.estaEnPersecucion()
+                                 ? QColor(215, 55, 65)
+                                 : QColor(135, 65, 175);
+        painter.fillRect(hitboxAgente, colorCuerpo);
+
+        int anchoVisorAgente = 12;
+        int xVisorAgente = agente.estaMirandoDerecha()
+                               ? (hitboxAgente.right() - anchoVisorAgente)
+                               : hitboxAgente.left();
+        painter.fillRect(xVisorAgente, hitboxAgente.top() + 10,
+                         anchoVisorAgente, 8, QColor(255, 220, 90));
+    }
+
+    // Clark Kent (parpadeo visual durante invulnerabilidad)
     QRect hitbox = jugador.getHitbox();
-    painter.fillRect(hitbox, QColor(40, 115, 225));
+    QColor colorClark = jugador.estaInvulnerable()
+                            ? QColor(120, 180, 255, 145)
+                            : QColor(40, 115, 225);
+    painter.fillRect(hitbox, colorClark);
 
     int anchoVisor = 14;
     int xVisor = jugador.estaMirandoDerecha()
@@ -184,12 +241,14 @@ void MainWindow::paintEvent(QPaintEvent *event) {
                      : hitbox.left();
     painter.fillRect(xVisor, hitbox.top() + 12, anchoVisor, 10, QColor(220, 50, 50));
 
-    // HUD
+    // HUD Superior
     int pistasRecogidas = totalPistas - static_cast<int>(pistas.size());
     painter.setPen(Qt::white);
     painter.setFont(QFont("Monospace", 11));
     painter.drawText(20, 30, "Controles: [A/D o Flechas] Mover | [W/Espacio] Saltar | [R] Reiniciar | [ESC] Menú");
-    painter.drawText(20, 55, QString("Pistas: %1/%2 | Salida: %3 | Pos: (%4, %5)")
+    painter.drawText(20, 55, QString("Vidas: %1/%2 | Pistas: %3/%4 | Salida: %5 | Pos: (%6, %7)")
+                                 .arg(jugador.getVidas())
+                                 .arg(jugador.getVidasMaximas())
                                  .arg(pistasRecogidas)
                                  .arg(totalPistas)
                                  .arg(pistas.isEmpty() ? "ABIERTA" : "BLOQUEADA")
