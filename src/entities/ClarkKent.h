@@ -7,6 +7,8 @@
 
 class ClarkKent : public Personaje {
 private:
+    float posX;
+    float posY;
     float vx;
     float vy;
     float velocidadMovimiento;
