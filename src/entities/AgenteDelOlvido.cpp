@@ -2,15 +2,19 @@
 #include "../physics/ConstantesFisicas.h"
 #include <cmath>
 
-AgenteDelOlvido::AgenteDelOlvido(float x, float y, float limiteIzq, float limiteDer)
+AgenteDelOlvido::AgenteDelOlvido(float x, float y, float limMin, float limMax, bool vertical)
     : Entidad(x, y, 44.0f, 48.0f),
       velocidadBase(Fisica::VELOCIDAD_AGENTE_PATRULLA),
       radioVision(Fisica::RADIO_VISION_AGENTE),
       contadorEvasiones(0),
       estadoActual(EstadoIA::PATRULLA),
-      limiteIzquierdo(limiteIzq),
-      limiteDerecho(limiteDer),
-      direccion(1.0f) {
+      limiteMin(limMin),
+      limiteMax(limMax),
+      direccion(1.0f),
+      patrullaVertical(vertical) {
+    if (patrullaVertical) {
+        alto = 44.0f;
+    }
 }
 
 void AgenteDelOlvido::actualizar() {
@@ -25,35 +29,59 @@ void AgenteDelOlvido::percibirEntorno(const ClarkKent& jugador) {
     }
 
     float centroAgenteX = x + (ancho * 0.5f);
+    float centroAgenteY = y + (alto * 0.5f);
     float centroJugadorX = static_cast<float>(jugador.getX()) + (jugador.getHitbox().width() * 0.5f);
-    float distanciaX = centroJugadorX - centroAgenteX;
+    float centroJugadorY = static_cast<float>(jugador.getY()) + (jugador.getHitbox().height() * 0.5f);
 
-    // Compara altura de los pies para detectar si comparten plataforma/suelo
+    float distanciaX = centroJugadorX - centroAgenteX;
+    float distanciaY = centroJugadorY - centroAgenteY;
+
+    if (jugador.esModoTopDown()) {
+        float distanciaEuclidiana = std::sqrt((distanciaX * distanciaX) + (distanciaY * distanciaY));
+        if (distanciaEuclidiana <= radioVision) {
+            estadoActual = EstadoIA::PERSECUCION;
+            if (patrullaVertical) {
+                direccion = (distanciaY >= 0.0f) ? 1.0f : -1.0f;
+            } else {
+                direccion = (distanciaX >= 0.0f) ? 1.0f : -1.0f;
+            }
+        } else {
+            if (estadoActual == EstadoIA::PERSECUCION) aprender();
+            estadoActual = EstadoIA::PATRULLA;
+        }
+        return;
+    }
+
     float piesAgenteY = y + alto;
     float piesJugadorY = static_cast<float>(jugador.getY() + jugador.getHitbox().height());
     float diferenciaVertical = std::abs(piesJugadorY - piesAgenteY);
 
     if (diferenciaVertical < 35.0f && std::abs(distanciaX) <= radioVision) {
-        if (estadoActual != EstadoIA::PERSECUCION) {
-            estadoActual = EstadoIA::PERSECUCION;
-        }
+        estadoActual = EstadoIA::PERSECUCION;
         direccion = (distanciaX >= 0.0f) ? 1.0f : -1.0f;
     } else {
-        if (estadoActual == EstadoIA::PERSECUCION) {
-            aprender();
-        }
+        if (estadoActual == EstadoIA::PERSECUCION) aprender();
         estadoActual = EstadoIA::PATRULLA;
     }
 }
 
 void AgenteDelOlvido::razonar() {
-    // Mantiene al agente dentro de los límites físicos de su plataforma
-    if (x <= limiteIzquierdo) {
-        x = limiteIzquierdo;
-        direccion = 1.0f;
-    } else if (x + ancho >= limiteDerecho) {
-        x = limiteDerecho - ancho;
-        direccion = -1.0f;
+    if (patrullaVertical) {
+        if (y <= limiteMin) {
+            y = limiteMin;
+            direccion = 1.0f;
+        } else if (y + alto >= limiteMax) {
+            y = limiteMax - alto;
+            direccion = -1.0f;
+        }
+    } else {
+        if (x <= limiteMin) {
+            x = limiteMin;
+            direccion = 1.0f;
+        } else if (x + ancho >= limiteMax) {
+            x = limiteMax - ancho;
+            direccion = -1.0f;
+        }
     }
 }
 
@@ -62,15 +90,24 @@ void AgenteDelOlvido::actuar() {
                                 ? Fisica::VELOCIDAD_AGENTE_PERSECUCION
                                 : velocidadBase;
 
-    // Movimiento Rectilíneo Uniforme (MRU): dx = v * dt
-    x += direccion * velocidadActual * Fisica::DT;
-
-    if (x < limiteIzquierdo) {
-        x = limiteIzquierdo;
-        direccion = 1.0f;
-    } else if (x + ancho > limiteDerecho) {
-        x = limiteDerecho - ancho;
-        direccion = -1.0f;
+    if (patrullaVertical) {
+        y += direccion * velocidadActual * Fisica::DT;
+        if (y < limiteMin) {
+            y = limiteMin;
+            direccion = 1.0f;
+        } else if (y + alto > limiteMax) {
+            y = limiteMax - alto;
+            direccion = -1.0f;
+        }
+    } else {
+        x += direccion * velocidadActual * Fisica::DT;
+        if (x < limiteMin) {
+            x = limiteMin;
+            direccion = 1.0f;
+        } else if (x + ancho > limiteMax) {
+            x = limiteMax - ancho;
+            direccion = -1.0f;
+        }
     }
 }
 

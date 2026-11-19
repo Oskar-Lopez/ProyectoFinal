@@ -14,13 +14,15 @@ private:
     int contadorEvasiones;
     EstadoIA estadoActual;
 
-    float limiteIzquierdo;
-    float limiteDerecho;
-    float direccion; // -1.0f izquierda, 1.0f derecha
+    float limiteMin;
+    float limiteMax;
+    float direccion;
+    bool patrullaVertical;
 
 public:
     AgenteDelOlvido(float x = 400.0f, float y = 300.0f,
-                    float limiteIzq = 260.0f, float limiteDer = 540.0f);
+                    float limMin = 260.0f, float limMax = 540.0f,
+                    bool vertical = false);
 
     void actualizar() override;
     void percibirEntorno(const ClarkKent& jugador);

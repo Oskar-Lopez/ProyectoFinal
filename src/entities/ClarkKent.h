@@ -16,6 +16,7 @@ private:
     float gravedad;
     bool enSuelo;
     bool mirandoDerecha;
+    bool modoTopDown;
 
     int vidasMaximas;
     float tiempoInvulnerable;
@@ -27,16 +28,23 @@ public:
     void moverse() override;
     void actualizar(int limiteAnchoPantalla, int ySuelo, const QVector<QRect> &plataformas = {});
 
+    void setModoTopDown(bool activar);
+    bool esModoTopDown() const;
     void setPosicion(int nuevoX, int nuevoY);
 
     void moverIzquierda();
     void moverDerecha();
+    void moverArriba();
+    void moverAbajo();
     void detenerHorizontal();
+    void detenerVertical();
     void saltar();
     void recibirDanio(int cantidad = 1);
     void reiniciarPosicion(int xInicial = 120, int yInicial = 500);
 
     QRect getHitbox() const;
+    float getVx() const;
+    float getVy() const;
     bool estaEnSuelo() const;
     bool estaMirandoDerecha() const;
     bool estaInvulnerable() const;

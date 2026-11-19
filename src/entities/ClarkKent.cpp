@@ -14,6 +14,7 @@ ClarkKent::ClarkKent(int xInicial, int yInicial, int ancho, int alto)
       gravedad(Fisica::GRAVEDAD),
       enSuelo(false),
       mirandoDerecha(true),
+      modoTopDown(false),
       vidasMaximas(Fisica::VIDAS_INICIALES_CLARK),
       tiempoInvulnerable(0.0f) {
 }
@@ -37,7 +38,43 @@ void ClarkKent::actualizar(int limiteAnchoPantalla, int ySuelo, const QVector<QR
         }
     }
 
-    // --- FASE 1: MOVIMIENTO (MRU) Y COLISIÓN HORIZONTAL (EJE X) ---
+    if (modoTopDown) {
+        // --- MODO NIVEL 2 (TOP-DOWN: MRU EN X E Y SIN GRAVEDAD) ---
+        const float margenX = 48.0f;
+        const float margenSup = 92.0f;
+        const float margenInf = 688.0f;
+
+        posX += vx * Fisica::DT;
+        if (posX < margenX) posX = margenX;
+        if (posX + ancho > static_cast<float>(limiteAnchoPantalla) - margenX) {
+            posX = static_cast<float>(limiteAnchoPantalla) - margenX - ancho;
+        }
+        x = posX;
+
+        for (const QRect &muro : plataformas) {
+            if (getHitbox().intersects(muro)) {
+                if (vx > 0.0f) posX = static_cast<float>(muro.x()) - ancho;
+                else if (vx < 0.0f) posX = static_cast<float>(muro.x() + muro.width());
+                x = posX;
+            }
+        }
+
+        posY += vy * Fisica::DT;
+        if (posY < margenSup) posY = margenSup;
+        if (posY + alto > margenInf) posY = margenInf - alto;
+        y = posY;
+
+        for (const QRect &muro : plataformas) {
+            if (getHitbox().intersects(muro)) {
+                if (vy > 0.0f) posY = static_cast<float>(muro.y()) - alto;
+                else if (vy < 0.0f) posY = static_cast<float>(muro.y() + muro.height());
+                y = posY;
+            }
+        }
+        return;
+    }
+
+    // --- MODO NIVEL 1 (SIDE-SCROLLER: MRU EN X + MRUA CON GRAVEDAD EN Y) ---
     posX += vx * Fisica::DT;
 
     if (posX < 0.0f) {
@@ -59,7 +96,6 @@ void ClarkKent::actualizar(int limiteAnchoPantalla, int ySuelo, const QVector<QR
         }
     }
 
-    // --- FASE 2: GRAVEDAD (MRUA) Y COLISIÓN VERTICAL (EJE Y) ---
     float desplazamientoY = (vy * Fisica::DT) + (0.5f * gravedad * Fisica::DT * Fisica::DT);
     vy += gravedad * Fisica::DT;
 
@@ -85,13 +121,29 @@ void ClarkKent::actualizar(int limiteAnchoPantalla, int ySuelo, const QVector<QR
         }
     }
 
-    // Colisión con el suelo base
     if (posY + alto >= static_cast<float>(ySuelo)) {
         posY = static_cast<float>(ySuelo) - alto;
         y = posY;
         vy = 0.0f;
         enSuelo = true;
     }
+}
+
+void ClarkKent::setModoTopDown(bool activar) {
+    modoTopDown = activar;
+    if (modoTopDown) {
+        ancho = 44.0f;
+        alto = 44.0f;
+        velocidadMovimiento = Fisica::VELOCIDAD_CLARK_TOPDOWN;
+    } else {
+        ancho = 46.0f;
+        alto = 76.0f;
+        velocidadMovimiento = Fisica::VELOCIDAD_CLARK;
+    }
+}
+
+bool ClarkKent::esModoTopDown() const {
+    return modoTopDown;
 }
 
 void ClarkKent::setPosicion(int nuevoX, int nuevoY) {
@@ -111,12 +163,30 @@ void ClarkKent::moverDerecha() {
     mirandoDerecha = true;
 }
 
+void ClarkKent::moverArriba() {
+    if (modoTopDown) {
+        vy = -velocidadMovimiento;
+    }
+}
+
+void ClarkKent::moverAbajo() {
+    if (modoTopDown) {
+        vy = velocidadMovimiento;
+    }
+}
+
 void ClarkKent::detenerHorizontal() {
     vx = 0.0f;
 }
 
+void ClarkKent::detenerVertical() {
+    if (modoTopDown) {
+        vy = 0.0f;
+    }
+}
+
 void ClarkKent::saltar() {
-    if (enSuelo) {
+    if (!modoTopDown && enSuelo) {
         vy = fuerzaSalto;
         enSuelo = false;
     }
@@ -133,8 +203,10 @@ void ClarkKent::recibirDanio(int cantidad) {
     }
 
     tiempoInvulnerable = Fisica::TIEMPO_INVULNERABILIDAD;
-    vy = Fisica::IMPULSO_SALTO_DANIO;
-    enSuelo = false;
+    if (!modoTopDown) {
+        vy = Fisica::IMPULSO_SALTO_DANIO;
+        enSuelo = false;
+    }
 }
 
 void ClarkKent::reiniciarPosicion(int xInicial, int yInicial) {
@@ -152,34 +224,13 @@ QRect ClarkKent::getHitbox() const {
                  static_cast<int>(ancho), static_cast<int>(alto));
 }
 
-bool ClarkKent::estaEnSuelo() const {
-    return enSuelo;
-}
-
-bool ClarkKent::estaMirandoDerecha() const {
-    return mirandoDerecha;
-}
-
-bool ClarkKent::estaInvulnerable() const {
-    return tiempoInvulnerable > 0.0f;
-}
-
-bool ClarkKent::estaVivo() const {
-    return vida > 0;
-}
-
-int ClarkKent::getVidas() const {
-    return vida;
-}
-
-int ClarkKent::getVidasMaximas() const {
-    return vidasMaximas;
-}
-
-int ClarkKent::getX() const {
-    return static_cast<int>(x);
-}
-
-int ClarkKent::getY() const {
-    return static_cast<int>(y);
-}
+float ClarkKent::getVx() const { return vx; }
+float ClarkKent::getVy() const { return vy; }
+bool ClarkKent::estaEnSuelo() const { return enSuelo; }
+bool ClarkKent::estaMirandoDerecha() const { return mirandoDerecha; }
+bool ClarkKent::estaInvulnerable() const { return tiempoInvulnerable > 0.0f; }
+bool ClarkKent::estaVivo() const { return vida > 0; }
+int ClarkKent::getVidas() const { return vida; }
+int ClarkKent::getVidasMaximas() const { return vidasMaximas; }
+int ClarkKent::getX() const { return static_cast<int>(x); }
+int ClarkKent::getY() const { return static_cast<int>(y); }
