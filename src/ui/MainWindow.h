@@ -5,10 +5,7 @@
 #include <QTimer>
 #include <QKeyEvent>
 #include <QPaintEvent>
-#include <QVector>
-#include <QRect>
-#include "../entities/ClarkKent.h"
-#include "../entities/AgenteDelOlvido.h"
+#include "../levels/Nivel.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -17,28 +14,21 @@ private:
     enum class EstadoJuego {
         MENU,
         JUGANDO,
+        TRANSICION_NIVEL,
         VICTORIA,
         GAME_OVER
     };
 
     EstadoJuego estadoActual;
     QTimer *timerJuego;
-    ClarkKent jugador;
-
-    QVector<QRect> plataformas;
-    QVector<QRect> pistas;
-    QVector<AgenteDelOlvido> agentes;
-    QRect metaNivel;
-    int totalPistas;
+    Nivel nivelActual;
 
     bool teclaIzquierda;
     bool teclaDerecha;
+    bool teclaArriba;
+    bool teclaAbajo;
 
-    static constexpr int ANCHO_VENTANA = 1280;
-    static constexpr int ALTO_VENTANA = 720;
-    static constexpr int NIVEL_SUELO = 620;
-
-    void iniciarEscenario();
+    void limpiarTeclas();
 
 private slots:
     void actualizarJuego();

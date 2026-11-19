@@ -7,44 +7,24 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
       estadoActual(EstadoJuego::MENU),
       timerJuego(new QTimer(this)),
-      jugador(120, 500, 46, 76),
-      totalPistas(3),
+      nivelActual(1),
       teclaIzquierda(false),
-      teclaDerecha(false) {
+      teclaDerecha(false),
+      teclaArriba(false),
+      teclaAbajo(false) {
 
-    setFixedSize(ANCHO_VENTANA, ALTO_VENTANA);
+    setFixedSize(Nivel::ANCHO_ESCENARIO, Nivel::ALTO_ESCENARIO);
     setWindowTitle("Proyecto Final - Clark Kent: El Último Trayecto");
-
-    iniciarEscenario();
 
     connect(timerJuego, &QTimer::timeout, this, &MainWindow::actualizarJuego);
     timerJuego->start(16);
 }
 
-void MainWindow::iniciarEscenario() {
-    jugador.reiniciarPosicion(120, 500);
-
-    plataformas = {
-        QRect(260, 500, 220, 24),
-        QRect(560, 400, 220, 24),
-        QRect(860, 300, 240, 24)
-    };
-
-    pistas = {
-        QRect(359, 462, 22, 22),
-        QRect(659, 362, 22, 22),
-        QRect(920, 262, 22, 22)
-    };
-    totalPistas = static_cast<int>(pistas.size());
-
-    // Despliegue de Agentes del Olvido patrullando suelo y plataformas elevadas
-    agentes = {
-        AgenteDelOlvido(360.0f, static_cast<float>(NIVEL_SUELO - 48), 320.0f, 820.0f),
-        AgenteDelOlvido(580.0f, 400.0f - 48.0f, 560.0f, 780.0f),
-        AgenteDelOlvido(880.0f, 300.0f - 48.0f, 860.0f, 1020.0f)
-    };
-
-    metaNivel = QRect(1030, 228, 44, 72);
+void MainWindow::limpiarTeclas() {
+    teclaIzquierda = false;
+    teclaDerecha = false;
+    teclaArriba = false;
+    teclaAbajo = false;
 }
 
 void MainWindow::keyPressEvent(QKeyEvent *event) {
@@ -56,12 +36,25 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
         estadoActual == EstadoJuego::VICTORIA ||
         estadoActual == EstadoJuego::GAME_OVER) {
         if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
-            iniciarEscenario();
+            limpiarTeclas();
+            nivelActual.cargarNivel(1);
             estadoActual = EstadoJuego::JUGANDO;
             update();
         }
         return;
     }
+
+    if (estadoActual == EstadoJuego::TRANSICION_NIVEL) {
+        if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+            limpiarTeclas();
+            nivelActual.avanzarSiguienteNivel();
+            estadoActual = EstadoJuego::JUGANDO;
+            update();
+        }
+        return;
+    }
+
+    ClarkKent *jugador = nivelActual.getJugador();
 
     switch (event->key()) {
         case Qt::Key_A:
@@ -74,15 +67,26 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
             break;
         case Qt::Key_W:
         case Qt::Key_Up:
+            teclaArriba = true;
+            if (!jugador->esModoTopDown()) {
+                jugador->saltar();
+            }
+            break;
         case Qt::Key_Space:
-            jugador.saltar();
+            if (!jugador->esModoTopDown()) {
+                jugador->saltar();
+            }
+            break;
+        case Qt::Key_S:
+        case Qt::Key_Down:
+            teclaAbajo = true;
             break;
         case Qt::Key_R:
-            iniciarEscenario();
+            limpiarTeclas();
+            nivelActual.reiniciarNivel();
             break;
         case Qt::Key_Escape:
-            teclaIzquierda = false;
-            teclaDerecha = false;
+            limpiarTeclas();
             estadoActual = EstadoJuego::MENU;
             break;
         default:
@@ -104,6 +108,14 @@ void MainWindow::keyReleaseEvent(QKeyEvent *event) {
         case Qt::Key_Right:
             teclaDerecha = false;
             break;
+        case Qt::Key_W:
+        case Qt::Key_Up:
+            teclaArriba = false;
+            break;
+        case Qt::Key_S:
+        case Qt::Key_Down:
+            teclaAbajo = false;
+            break;
         default:
             QMainWindow::keyReleaseEvent(event);
     }
@@ -111,50 +123,38 @@ void MainWindow::keyReleaseEvent(QKeyEvent *event) {
 
 void MainWindow::actualizarJuego() {
     if (estadoActual == EstadoJuego::JUGANDO) {
+        ClarkKent *jugador = nivelActual.getJugador();
+
         if (teclaIzquierda && !teclaDerecha) {
-            jugador.moverIzquierda();
+            jugador->moverIzquierda();
         } else if (teclaDerecha && !teclaIzquierda) {
-            jugador.moverDerecha();
+            jugador->moverDerecha();
         } else {
-            jugador.detenerHorizontal();
+            jugador->detenerHorizontal();
         }
 
-        jugador.actualizar(ANCHO_VENTANA, NIVEL_SUELO, plataformas);
-
-        QRect hitboxJugador = jugador.getHitbox();
-
-        // Actualizar agentes enemigos y evaluar daño por contacto
-        for (AgenteDelOlvido &agente : agentes) {
-            agente.percibirEntorno(jugador);
-            agente.actualizar();
-
-            if (hitboxJugador.intersects(agente.getHitbox())) {
-                jugador.recibirDanio(1);
-            }
-        }
-
-        if (!jugador.estaVivo()) {
-            teclaIzquierda = false;
-            teclaDerecha = false;
-            estadoActual = EstadoJuego::GAME_OVER;
-            update();
-            return;
-        }
-
-        // Recolección de pistas
-        for (int i = 0; i < static_cast<int>(pistas.size()); ) {
-            if (hitboxJugador.intersects(pistas[i])) {
-                pistas.removeAt(i);
+        if (jugador->esModoTopDown()) {
+            if (teclaArriba && !teclaAbajo) {
+                jugador->moverArriba();
+            } else if (teclaAbajo && !teclaArriba) {
+                jugador->moverAbajo();
             } else {
-                ++i;
+                jugador->detenerVertical();
             }
         }
 
-        // Condición de victoria
-        if (pistas.isEmpty() && hitboxJugador.intersects(metaNivel)) {
-            teclaIzquierda = false;
-            teclaDerecha = false;
-            estadoActual = EstadoJuego::VICTORIA;
+        nivelActual.actualizar();
+
+        if (nivelActual.verificarDerrota()) {
+            limpiarTeclas();
+            estadoActual = EstadoJuego::GAME_OVER;
+        } else if (nivelActual.verificarVictoria()) {
+            limpiarTeclas();
+            if (nivelActual.getNumeroNivel() == 1) {
+                estadoActual = EstadoJuego::TRANSICION_NIVEL;
+            } else {
+                estadoActual = EstadoJuego::VICTORIA;
+            }
         }
     }
 
@@ -175,11 +175,19 @@ void MainWindow::paintEvent(QPaintEvent *event) {
         return;
     }
 
+    if (estadoActual == EstadoJuego::TRANSICION_NIVEL) {
+        painter.setPen(QColor(245, 200, 60));
+        painter.setFont(QFont("Arial", 26, QFont::Bold));
+        painter.drawText(rect(), Qt::AlignCenter,
+                         "NIVEL 1 COMPLETADO\n\nSiguiente: Nivel 2 - La Firma (Teatro Colón)\nUsa W/A/S/D para infiltrarte y empujar cajas\n\nPresiona ENTER para continuar");
+        return;
+    }
+
     if (estadoActual == EstadoJuego::VICTORIA) {
         painter.setPen(QColor(80, 220, 130));
         painter.setFont(QFont("Arial", 30, QFont::Bold));
         painter.drawText(rect(), Qt::AlignCenter,
-                         "¡OBJETIVO COMPLETADO!\n\nPresiona ENTER para volver a jugar");
+                         "¡MISIÓN CUMPLIDA EN EL TEATRO COLÓN!\n\nPresiona ENTER para volver a jugar");
         return;
     }
 
@@ -187,71 +195,100 @@ void MainWindow::paintEvent(QPaintEvent *event) {
         painter.setPen(QColor(235, 75, 75));
         painter.setFont(QFont("Arial", 30, QFont::Bold));
         painter.drawText(rect(), Qt::AlignCenter,
-                         "¡TE HAN DESCUBIERTO!\n\nPresiona ENTER para reintentar");
+                         "¡MISIÓN FALLIDA!\n\nPresiona ENTER para reintentar desde el Nivel 1");
         return;
     }
 
-    // Suelo base
-    painter.fillRect(0, NIVEL_SUELO, ANCHO_VENTANA, ALTO_VENTANA - NIVEL_SUELO, QColor(65, 72, 85));
-    painter.fillRect(0, NIVEL_SUELO, ANCHO_VENTANA, 6, QColor(110, 120, 138));
+    const int numNivel = nivelActual.getNumeroNivel();
 
-    // Plataformas elevadas
-    for (const QRect &plat : plataformas) {
-        painter.fillRect(plat, QColor(85, 95, 115));
-        painter.fillRect(plat.x(), plat.y(), plat.width(), 5, QColor(145, 160, 185));
+    if (numNivel == 1) {
+        // Escenario Nivel 1: Side-scroller Bogotá
+        painter.fillRect(0, Nivel::NIVEL_SUELO, Nivel::ANCHO_ESCENARIO,
+                         Nivel::ALTO_ESCENARIO - Nivel::NIVEL_SUELO, QColor(65, 72, 85));
+        painter.fillRect(0, Nivel::NIVEL_SUELO, Nivel::ANCHO_ESCENARIO, 6, QColor(110, 120, 138));
+
+        for (const QRect &plat : nivelActual.getEstructuras()) {
+            painter.fillRect(plat, QColor(85, 95, 115));
+            painter.fillRect(plat.x(), plat.y(), plat.width(), 5, QColor(145, 160, 185));
+        }
+    } else {
+        // Escenario Nivel 2: Top-Down Teatro Colón
+        painter.fillRect(48, 92, Nivel::ANCHO_ESCENARIO - 96, 596, QColor(58, 24, 32));
+        painter.setPen(QPen(QColor(180, 145, 75), 4));
+        painter.drawRect(48, 92, Nivel::ANCHO_ESCENARIO - 96, 596);
+        painter.setPen(Qt::NoPen);
+
+        for (const QRect &muro : nivelActual.getEstructuras()) {
+            painter.fillRect(muro, QColor(125, 100, 62));
+        }
     }
 
-    // Meta del nivel (gris bloqueada, verde cuando se recogen todas las pistas)
-    QColor colorMeta = pistas.isEmpty() ? QColor(50, 205, 110) : QColor(110, 110, 120);
-    painter.fillRect(metaNivel, colorMeta);
+    // Meta del nivel
+    QColor colorMeta = nivelActual.salidaAbierta() ? QColor(50, 205, 110) : QColor(110, 110, 120);
+    painter.fillRect(nivelActual.getMetaNivel(), colorMeta);
 
-    // Pistas recolectables
+    // Pistas / Documentos recolectables
     painter.setBrush(QColor(245, 200, 60));
     painter.setPen(Qt::NoPen);
-    for (const QRect &pista : pistas) {
+    for (const QRect &pista : nivelActual.getPistas()) {
         painter.drawEllipse(pista);
     }
 
+    // Obstáculos polimórficos (Escombros en Nivel 1, Cajas en Nivel 2)
+    for (const Obstaculo *obs : nivelActual.getObstaculos()) {
+        if (obs->causaDanio()) {
+            painter.setBrush(QColor(235, 130, 45));
+            painter.drawEllipse(obs->getHitbox());
+        } else if (obs->esSolido()) {
+            painter.fillRect(obs->getHitbox(), QColor(165, 115, 65));
+            painter.setPen(QPen(QColor(95, 60, 30), 2));
+            painter.drawRect(obs->getHitbox());
+            painter.setPen(Qt::NoPen);
+        }
+    }
+
     // Agentes del Olvido
-    for (const AgenteDelOlvido &agente : agentes) {
-        QRect hitboxAgente = agente.getHitbox();
-        QColor colorCuerpo = agente.estaEnPersecucion()
+    for (const AgenteDelOlvido *agente : nivelActual.getEnemigos()) {
+        QRect hitboxAgente = agente->getHitbox();
+        QColor colorCuerpo = agente->estaEnPersecucion()
                                  ? QColor(215, 55, 65)
                                  : QColor(135, 65, 175);
         painter.fillRect(hitboxAgente, colorCuerpo);
 
         int anchoVisorAgente = 12;
-        int xVisorAgente = agente.estaMirandoDerecha()
+        int xVisorAgente = agente->estaMirandoDerecha()
                                ? (hitboxAgente.right() - anchoVisorAgente)
                                : hitboxAgente.left();
         painter.fillRect(xVisorAgente, hitboxAgente.top() + 10,
                          anchoVisorAgente, 8, QColor(255, 220, 90));
     }
 
-    // Clark Kent (parpadeo visual durante invulnerabilidad)
-    QRect hitbox = jugador.getHitbox();
-    QColor colorClark = jugador.estaInvulnerable()
+    // Clark Kent
+    ClarkKent *jugador = nivelActual.getJugador();
+    QRect hitbox = jugador->getHitbox();
+    QColor colorClark = jugador->estaInvulnerable()
                             ? QColor(120, 180, 255, 145)
                             : QColor(40, 115, 225);
     painter.fillRect(hitbox, colorClark);
 
     int anchoVisor = 14;
-    int xVisor = jugador.estaMirandoDerecha()
+    int xVisor = jugador->estaMirandoDerecha()
                      ? (hitbox.right() - anchoVisor)
                      : hitbox.left();
-    painter.fillRect(xVisor, hitbox.top() + 12, anchoVisor, 10, QColor(220, 50, 50));
+    painter.fillRect(xVisor, hitbox.top() + 10, anchoVisor, 9, QColor(220, 50, 50));
 
     // HUD Superior
-    int pistasRecogidas = totalPistas - static_cast<int>(pistas.size());
     painter.setPen(Qt::white);
     painter.setFont(QFont("Monospace", 11));
-    painter.drawText(20, 30, "Controles: [A/D o Flechas] Mover | [W/Espacio] Saltar | [R] Reiniciar | [ESC] Menú");
-    painter.drawText(20, 55, QString("Vidas: %1/%2 | Pistas: %3/%4 | Salida: %5 | Pos: (%6, %7)")
-                                 .arg(jugador.getVidas())
-                                 .arg(jugador.getVidasMaximas())
-                                 .arg(pistasRecogidas)
-                                 .arg(totalPistas)
-                                 .arg(pistas.isEmpty() ? "ABIERTA" : "BLOQUEADA")
-                                 .arg(jugador.getX())
-                                 .arg(jugador.getY()));
+    QString textoControles = (numNivel == 1)
+                                 ? "Controles: [A/D] Mover | [W/Espacio] Saltar | [R] Reiniciar | [ESC] Menú"
+                                 : "Controles: [W/A/S/D] Mover e impulsar cajas | [R] Reiniciar | [ESC] Menú";
+    painter.drawText(20, 28, QString("%1  |  %2").arg(nivelActual.getTituloNivel(), textoControles));
+    painter.drawText(20, 54, QString("Vidas: %1/%2 | Pistas: %3/%4 | Tiempo: %5s | Salida: %6")
+                                 .arg(jugador->getVidas())
+                                 .arg(jugador->getVidasMaximas())
+                                 .arg(nivelActual.getPistasRecogidas())
+                                 .arg(nivelActual.getTotalPistas())
+                                 .arg(nivelActual.getTiempoRestante())
+                                 .arg(nivelActual.salidaAbierta() ? "ABIERTA" : "BLOQUEADA"));
 }
